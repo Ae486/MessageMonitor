@@ -1,0 +1,3 @@
+# Record offline intervals as capture gaps without backfill
+
+The first version records every disconnect or offline interval as an account-level Capture Gap and never calls the bridge's history APIs. Bounded backfill was designed and LLOneBot exposes the required APIs, but it was deferred: with the daily-GUI deployment offline periods are routine, and backfilled megabatches would force oversized summary units into intra-unit map/reduce whose evidence linking degrades. The message idempotency key and frozen-unit rules are preserved so a later recovery extension can backfill into the same store, reintroduce the `recovering` state and conversation-level gaps, and mark existing gaps resolved.

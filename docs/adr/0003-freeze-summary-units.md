@@ -1,0 +1,3 @@
+# Freeze summary units when work starts
+
+When a conversation reaches its configured threshold, the summary worker freezes the oldest unsummarized messages that fit the per-call token budget — usually all of them — into one non-overlapping Summary Unit; messages arriving later, and any backlog beyond the budget, belong to subsequent units. Every unit is therefore summarized in a single model call with direct message-level evidence, and intra-unit map/reduce is unnecessary. Failed work retries the same boundary and may eventually become a Summary Gap, allowing later units to continue without changing historical membership.

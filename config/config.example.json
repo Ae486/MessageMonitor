@@ -1,0 +1,81 @@
+{
+  "configVersion": 1,
+  "account": {
+    "targetSelfUin": "14549711115"
+  },
+  "bridge": {
+    "provider": "llonebot",
+    "protocol": "onebot11",
+    "mode": "forward-websocket",
+    "url": "ws://127.0.0.1:3001",
+    "accessTokenEnv": "QQ_MONITOR_ONEBOT_TOKEN",
+    "connectTimeoutMs": 5000,
+    "reconnectIntervalMs": 5000,
+    "heartbeatTimeoutMs": 130000,
+    "requireSelfMessageReporting": true
+  },
+  "capture": {
+    "groups": {
+      "whitelist": [
+        "123456789"
+      ]
+    },
+    "friends": {
+      "mode": "all",
+      "whitelist": []
+    }
+  },
+  "messages": {
+    "retainRecalledContent": true,
+    "exposeRecalledContentToAgent": false
+  },
+  "storage": {
+    "databasePath": "${LOCALAPPDATA}/QQMessageMonitor/data/monitor.db",
+    "messageRetentionDays": 30,
+    "summaryRetentionDays": 180,
+    "cleanupIntervalHours": 24
+  },
+  "summary": {
+    "enabled": true,
+    "groupWhitelist": [
+      "123456789"
+    ],
+    "threshold": 30,
+    "maxConcurrentTasks": 1,
+    "maxInputTokensPerCall": 12000,
+    "maxRetries": 3,
+    "retryBaseDelayMs": 5000,
+    "requestTimeoutMs": 60000,
+    "additionalPrompt": "使用简体中文，优先保留对后续交流有价值的明确事实。",
+    "producer": {
+      "type": "openai-compatible",
+      "baseUrl": "https://api.example.com/v1",
+      "model": "summary-model",
+      "apiKeyEnv": "QQ_MONITOR_LLM_API_KEY"
+    },
+    "dimensions": {
+      "keyPoints": {
+        "description": "值得注意的关键事实或信息"
+      },
+      "decisions": {
+        "description": "参与者明确达成的决定、约定或安排"
+      },
+      "openQuestions": {
+        "description": "尚未解决或仍待确认的问题"
+      },
+      "ownerRelevance": {
+        "description": "与主人直接相关或明确提到主人的内容"
+      },
+      "conflicts": {
+        "description": "参与者之间明确出现的分歧、争执或冲突"
+      }
+    }
+  },
+  "agent": {
+    "consumerId": "taki-main"
+  },
+  "logging": {
+    "level": "info",
+    "includeMessageContent": false
+  }
+}
