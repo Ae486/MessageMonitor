@@ -183,8 +183,9 @@ QQ Message Monitor 为陪伴型 Agent 提供稳定、低干扰、只读的 QQ �
 
 2026-07-27 与真实 LLBot Desktop（LLOneBot 系）联调已证实：账号验证与基线建立、群/好友白名单采集、主人 PC 端消息上报（需在连接设置勾选「上报自身」）、好友/群撤回标记、消息幂等（`message_id` 真实样本未见冲突）、阅读双进度与一键已读、断线缺口记录、DeepSeek `deepseek-v4-flash` 经 `response_format: json_object` 的摘要全链路（冻结/维度/证据引用）均按契约工作。
 
+主人从手机端发送后同步到 PC 的消息同样正常上报（2026-07-27 实测）。
+
 仍待验证：
 
-- 主人从手机端发送后同步到 PC 的消息是否上报。
 - TakiAgent 的 MCP 客户端已实现（`TAKI_DATA_DIR/mcp-servers.json` 扁平映射、启动时以 `shell:false` 拉起 stdio 子进程、工具命名空间化），但未经真实外部 MCP 服务端验证，需在接入阶段实测工具清单、Schema 与退出行为。
 - 目标资源预算需要通过实现后的 Windows 基准测试确定。

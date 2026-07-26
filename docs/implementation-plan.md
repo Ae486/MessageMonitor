@@ -230,9 +230,10 @@ fixture 至少包含：
 
 这些不是产品歧义，而是外部兼容性验证项。2026-07-27 实测已确认：LLBot 心跳 60 秒稳定、`message_id` 幂等未见冲突、`reportSelfMessage` 即连接设置的「上报自身」开关（勾选并重启后 PC 端主人消息正常上报）、`node:sqlite` 全程稳定、DeepSeek 支持 `response_format: json_object`。
 
+手机端发送后同步到 PC 的主人消息同样正常上报（2026-07-27 实测）。
+
 仍待验证：
 
-- 主人从手机端发送后同步到 PC 的消息是否上报。
 - TakiAgent 对 MCP 工具输出 Schema、工具描述刷新和进程退出的实际行为。
 
 验证结果若改变外部契约，应先更新需求/工具/配置文档；若只是适配细节，记录在测试 fixture 和 Adapter 注释中。
