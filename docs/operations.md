@@ -6,18 +6,18 @@
 
 ## 2. 前置条件
 
-### 2.1 QQ 与 LLOneBot
+### 2.1 QQ 与 LLBot（LLOneBot）
 
-1. 安装受当前 LLOneBot 版本支持的 Windows 官方 NTQQ。
-2. 独立安装 LLOneBot（Windows 发行包含 PMHQ 与自带 Node 运行时）。
-3. 通过 LLOneBot/PMHQ 启动入口拉起官方 QQ；日常使用改用该入口（可设开机自启）。
+1. 安装受当前版本支持的 Windows 官方 NTQQ。
+2. 下载 **LLBot-Desktop-win-x64.zip**（桌面版，含管理界面与自带运行时）并解压运行。
+3. 由 LLBot 拉起官方 QQ；官方文档明确"必须由 LLBot 拉起 QQ，手动打开的 QQ 不生效"。日常使用改用该入口（可设开机自启）。
 4. 在该 QQ 窗口登录 `account.targetSelfUin` 对应账号；GUI 可照常日常聊天。
-5. 在 LLOneBot 管理界面（WebUI 默认端口 3080）启用 OneBot 11 正向 WebSocket 服务端；该服务端默认关闭，默认端口 3001。
-6. 服务端只监听 `127.0.0.1`。
-7. 设置 Token。
-8. 在对应连接类型上开启 `reportSelfMessage`，确保主人自己发送的消息会上报。
+5. 在 Bot配置 → OneBot 11 中启用 **WebSocket 服务端(正向)**；默认关闭，端口 3001，监听地址保持"本地"。
+6. 消息格式保持 `array`。
+7. 设置 Token（界面标注可选，但本服务必需）。
+8. 勾选**「上报自身」**（即 `reportSelfMessage`），保存并重启 LLBot——确保主人自己发送的消息会上报。
 
-普通 QQ 快捷方式启动、未经 PMHQ 拉起的已有进程不属于第一版消息来源，无法事后贴附。
+普通 QQ 快捷方式启动、未经 LLBot 拉起的已有进程不属于第一版消息来源，无法事后贴附。
 
 ### 2.2 摘要模型
 

@@ -228,12 +228,11 @@ fixture 至少包含：
 
 ## 7. 需要在实现中验证的事项
 
-这些不是产品歧义，而是外部兼容性验证项：
+这些不是产品歧义，而是外部兼容性验证项。2026-07-27 实测已确认：LLBot 心跳 60 秒稳定、`message_id` 幂等未见冲突、`reportSelfMessage` 即连接设置的「上报自身」开关（勾选并重启后 PC 端主人消息正常上报）、`node:sqlite` 全程稳定、DeepSeek 支持 `response_format: json_object`。
 
-- OneBot 心跳和 lifecycle 事件在 LLOneBot/PMHQ Windows 环境下的实际时序。
-- LLOneBot `reportSelfMessage` 的实际行为，以及主人从手机端发送后同步到 PC 的消息是否上报。
-- Node.js 目标版本中 `node:sqlite` 的稳定 API 和分发要求。
-- 所选摘要模型服务对结构化输出的实际支持方式（`json_schema`、tool 调用或文本解析加校验）。
+仍待验证：
+
+- 主人从手机端发送后同步到 PC 的消息是否上报。
 - TakiAgent 对 MCP 工具输出 Schema、工具描述刷新和进程退出的实际行为。
 
 验证结果若改变外部契约，应先更新需求/工具/配置文档；若只是适配细节，记录在测试 fixture 和 Adapter 注释中。
