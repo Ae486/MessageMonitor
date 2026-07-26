@@ -5,8 +5,10 @@
  */
 import process from "node:process";
 import { ConfigError, loadConfig } from "./config/load-config.ts";
+import { createIngestCoordinator } from "./ingest/ingest-coordinator.ts";
 import { createLogger, type Logger } from "./logging/logger.ts";
 import { connectStdio, createMcpServer } from "./mcp/server.ts";
+import { createLifecycleController } from "./runtime/lifecycle-controller.ts";
 import { createShutdown, installShutdownTriggers } from "./runtime/shutdown.ts";
 import { openDatabase, type Database } from "./storage/database.ts";
 import { createStorage } from "./storage/index.ts";
@@ -65,11 +67,33 @@ async function main(): Promise<void> {
     config.storage.cleanupIntervalHours * 60 * 60 * 1000,
   );
 
+  const storage = createStorage(db);
+  const accessToken = process.env[config.bridge.accessTokenEnv] ?? "";
+  const ingest = createIngestCoordinator(config, storage, log);
+  const lifecycle = createLifecycleController(
+    {
+      targetSelfUin: config.account.targetSelfUin,
+      url: config.bridge.url,
+      accessToken,
+      connectTimeoutMs: config.bridge.connectTimeoutMs,
+      reconnectIntervalMs: config.bridge.reconnectIntervalMs,
+      heartbeatTimeoutMs: config.bridge.heartbeatTimeoutMs,
+    },
+    {
+      storage,
+      log,
+      onEvent: (event, now) => {
+        ingest.handleEvent(event, now);
+      },
+    },
+  );
+
   const server = createMcpServer(VERSION);
   const shutdown = createShutdown(
     {
       close: async () => {
         clearInterval(cleanupTimer);
+        await lifecycle.close();
         await server.close();
         db.close();
       },
@@ -83,6 +107,7 @@ async function main(): Promise<void> {
   installShutdownTriggers(shutdown);
 
   await connectStdio(server);
+  lifecycle.start();
   log.info(
     {
       version: VERSION,

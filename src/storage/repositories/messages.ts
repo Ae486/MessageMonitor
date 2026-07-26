@@ -24,9 +24,26 @@ export interface IngestResult {
   conversationId: number;
 }
 
+export interface RecallInput {
+  conversationId: number;
+  sourceMessageId: string;
+  operatorUin?: string;
+  /** When false (retainRecalledContent=false), the captured body is cleared. */
+  retainContent: boolean;
+}
+
 export interface MessagesRepo {
   ingest(conversation: ConversationIdentity, message: IncomingMessage, now: number): IngestResult;
+  /** Marks a captured message recalled; no-op for unknown or already-recalled messages. */
+  markRecalled(recall: RecallInput, now: number): boolean;
   getById(messageId: number): MessageRow | undefined;
+  /** Resolves which friend conversation holds a captured message (owner self-recall path). */
+  findFriendConversation(
+    selfUin: string,
+    sourceMessageId: string,
+  ): { conversationId: number; sourceId: string } | undefined;
+  /** Wall-clock time of the most recent ingest checkpoint advance, if any. */
+  latestCheckpointAt(): number | undefined;
 }
 
 export interface MessageRow {
@@ -76,6 +93,27 @@ export function createMessagesRepo(db: Database, conversations: ConversationsRep
     VALUES (?, 'message', ?, ?)
   `);
   const selectById = db.raw.prepare("SELECT * FROM messages WHERE id = ?");
+  const markRecalledStmt = db.raw.prepare(`
+    UPDATE messages SET recalled_at = ?, recall_operator_uin = ?
+    WHERE conversation_id = ? AND source_message_id = ? AND recalled_at IS NULL
+    RETURNING id
+  `);
+  const clearContentStmt = db.raw.prepare(
+    "UPDATE messages SET segments_json = NULL, projection = NULL WHERE id = ?",
+  );
+  const insertRecallFeedEvent = db.raw.prepare(`
+    INSERT INTO feed_events (conversation_id, kind, message_id, occurred_at)
+    VALUES (?, 'recall', ?, ?)
+  `);
+  const findFriendConversationStmt = db.raw.prepare(`
+    SELECT c.id AS conversation_id, c.source_id
+    FROM messages m JOIN conversations c ON c.id = m.conversation_id
+    WHERE c.self_uin = ? AND c.type = 'friend' AND m.source_message_id = ?
+    LIMIT 2
+  `);
+  const latestCheckpointStmt = db.raw.prepare(
+    "SELECT MAX(updated_at) AS latest FROM bridge_checkpoints",
+  );
 
   return {
     ingest(conversation, message, now) {
@@ -122,8 +160,37 @@ export function createMessagesRepo(db: Database, conversations: ConversationsRep
         return { inserted, messageId, conversationId };
       });
     },
+    markRecalled(recall, now) {
+      return db.transaction(() => {
+        const row = markRecalledStmt.get(
+          now,
+          recall.operatorUin ?? null,
+          recall.conversationId,
+          recall.sourceMessageId,
+        ) as { id: number } | undefined;
+        if (row === undefined) return false;
+        if (!recall.retainContent) {
+          clearContentStmt.run(row.id);
+        }
+        insertRecallFeedEvent.run(recall.conversationId, row.id, now);
+        return true;
+      });
+    },
     getById(messageId) {
       return selectById.get(messageId) as MessageRow | undefined;
+    },
+    findFriendConversation(selfUin, sourceMessageId) {
+      const rows = findFriendConversationStmt.all(selfUin, sourceMessageId) as unknown as {
+        conversation_id: number;
+        source_id: string;
+      }[];
+      // Ambiguous source ids across conversations cannot be resolved safely.
+      if (rows.length !== 1 || rows[0] === undefined) return undefined;
+      return { conversationId: rows[0].conversation_id, sourceId: rows[0].source_id };
+    },
+    latestCheckpointAt() {
+      const row = latestCheckpointStmt.get() as { latest: number | null };
+      return row.latest ?? undefined;
     },
   };
 }
