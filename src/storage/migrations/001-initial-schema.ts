@@ -147,5 +147,22 @@ CREATE TABLE conversation_read_progress (
   updated_at INTEGER NOT NULL,
   PRIMARY KEY (consumer_id, conversation_id)
 ) STRICT;
+
+-- O(1) row counts for the status tool: requirements 3.2 forbids scanning the
+-- full messages table, and SQLite COUNT(*) walks every leaf page.
+CREATE TABLE table_counters (
+  name TEXT PRIMARY KEY,
+  count INTEGER NOT NULL
+) STRICT;
+INSERT INTO table_counters (name, count) VALUES ('messages', 0), ('summary_units', 0);
+
+CREATE TRIGGER messages_counter_insert AFTER INSERT ON messages
+BEGIN UPDATE table_counters SET count = count + 1 WHERE name = 'messages'; END;
+CREATE TRIGGER messages_counter_delete AFTER DELETE ON messages
+BEGIN UPDATE table_counters SET count = count - 1 WHERE name = 'messages'; END;
+CREATE TRIGGER summary_units_counter_insert AFTER INSERT ON summary_units
+BEGIN UPDATE table_counters SET count = count + 1 WHERE name = 'summary_units'; END;
+CREATE TRIGGER summary_units_counter_delete AFTER DELETE ON summary_units
+BEGIN UPDATE table_counters SET count = count - 1 WHERE name = 'summary_units'; END;
 `);
 }

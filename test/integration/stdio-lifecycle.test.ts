@@ -96,7 +96,9 @@ function run(configPath: string, env: Record<string, string>): RunResult {
 
 describe("stdio lifecycle", () => {
   it("starts with a valid config, keeps stdout clean, and shuts down gracefully on stdin close", async () => {
-    const configPath = writeTempConfig(validConfig(tmpdir()));
+    const freshDir = mkdtempSync(join(tmpdir(), "qqmon-db-int-"));
+    tempDirs.push(freshDir);
+    const configPath = writeTempConfig(validConfig(freshDir));
     const result = run(configPath, { TEST_ONEBOT_TOKEN: "integration-token" });
 
     await result.stderrLine((line) => line.includes("qq-message-monitor started"));
@@ -116,7 +118,7 @@ describe("stdio lifecycle", () => {
       account: { targetSelfUin: "not-digits" },
       bridge: { url: "ws://127.0.0.1:3001", accessTokenEnv: "TEST_ONEBOT_TOKEN" },
       capture: { groups: { whitelist: [] }, friends: { mode: "all", whitelist: [] } },
-      storage: { databasePath: join(tmpdir(), "qqmon-int-db", "monitor.db") },
+      storage: { databasePath: join(mkdtempSync(join(tmpdir(), "qqmon-db-bad-")), "monitor.db") },
       recovery: { enabled: true },
     });
     const result = run(configPath, { TEST_ONEBOT_TOKEN: "super-sekret-token-value" });

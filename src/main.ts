@@ -10,6 +10,10 @@ import { createLogger, type Logger } from "./logging/logger.ts";
 import { connectStdio, createMcpServer } from "./mcp/server.ts";
 import { createLifecycleController } from "./runtime/lifecycle-controller.ts";
 import { createShutdown, installShutdownTriggers } from "./runtime/shutdown.ts";
+import { createFeedService } from "./feed/feed-service.ts";
+import { registerTools } from "./mcp/register-tools.ts";
+import { createStatusService, type ServiceHealth } from "./mcp/status-service.ts";
+import { createConversationReader } from "./query/conversation-reader.ts";
 import { openDatabase, type Database } from "./storage/database.ts";
 import { createStorage } from "./storage/index.ts";
 import { runCleanup } from "./storage/maintenance/cleanup.ts";
@@ -19,7 +23,12 @@ import type { AppConfig } from "./config/schema.ts";
 
 const VERSION = "0.1.0";
 
-function runScheduledCleanup(db: Database, config: AppConfig, log: Logger): void {
+function runScheduledCleanup(
+  db: Database,
+  config: AppConfig,
+  log: Logger,
+  health: ServiceHealth,
+): void {
   try {
     const result = runCleanup(db, {
       messageRetentionDays: config.storage.messageRetentionDays,
@@ -27,9 +36,11 @@ function runScheduledCleanup(db: Database, config: AppConfig, log: Logger): void
       now: Date.now(),
     });
     createStorage(db).runtimeState.set("lastCleanupAt", Date.now(), Date.now());
+    health.maintenanceFailed = false;
     log.info({ ...result }, "retention cleanup finished");
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
+    health.maintenanceFailed = true;
     log.warn({ err: reason }, "retention cleanup failed; capture is unaffected");
   }
 }
@@ -61,15 +72,32 @@ async function main(): Promise<void> {
     return;
   }
 
-  runScheduledCleanup(db, config, log);
+  const health: ServiceHealth = { storageDegraded: false, maintenanceFailed: false };
+  runScheduledCleanup(db, config, log, health);
   const cleanupTimer = setInterval(
     () => {
-      runScheduledCleanup(db, config, log);
+      runScheduledCleanup(db, config, log, health);
     },
     config.storage.cleanupIntervalHours * 60 * 60 * 1000,
   );
 
   const storage = createStorage(db);
+
+  // configuration.md section 5: a database is bound to one monitoring
+  // identity; switching targetSelfUin requires a fresh database path.
+  const boundUin = storage.runtimeState.get<string>("targetSelfUin");
+  if (boundUin === undefined) {
+    storage.runtimeState.set("targetSelfUin", config.account.targetSelfUin, Date.now());
+  } else if (boundUin !== config.account.targetSelfUin) {
+    log.error(
+      { boundUin, configuredUin: config.account.targetSelfUin },
+      "this database belongs to a different target account; use a new databasePath",
+    );
+    db.close();
+    process.exitCode = 1;
+    return;
+  }
+
   const accessToken = process.env[config.bridge.accessTokenEnv] ?? "";
 
   const producerConfig = config.summary.producer;
@@ -113,6 +141,19 @@ async function main(): Promise<void> {
   );
 
   const server = createMcpServer(VERSION);
+  registerTools(server, {
+    status: createStatusService({
+      db,
+      storage,
+      config,
+      lifecycle,
+      summaryQueue,
+      health,
+    }),
+    feed: createFeedService(db, storage, config.agent.consumerId, config.account.targetSelfUin),
+    reader: createConversationReader(db, storage, config),
+    config,
+  });
   const shutdown = createShutdown(
     {
       close: async () => {

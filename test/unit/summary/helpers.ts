@@ -27,7 +27,7 @@ export function summaryConfig(overrides: Partial<SummaryConfig> = {}): SummaryCo
 export interface FakeProducer extends SummaryProducer {
   prompts: BuiltPrompt[];
   script: (
-    | { kind: "ok"; content: (prompt: BuiltPrompt) => string }
+    | { kind: "ok"; content: (prompt: BuiltPrompt) => string; gate?: Promise<void> }
     | { kind: "error"; error: Error }
   )[];
 }
@@ -36,12 +36,13 @@ export function fakeProducer(): FakeProducer {
   const producer: FakeProducer = {
     prompts: [],
     script: [],
-    produce(prompt) {
+    async produce(prompt) {
       producer.prompts.push(prompt);
       const step = producer.script.shift();
       if (step === undefined) throw new Error("fake producer script exhausted");
-      if (step.kind === "error") return Promise.reject(step.error);
-      return Promise.resolve(step.content(prompt));
+      if (step.kind === "error") throw step.error;
+      if (step.gate !== undefined) await step.gate;
+      return step.content(prompt);
     },
   };
   return producer;
