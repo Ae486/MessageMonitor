@@ -14,6 +14,8 @@ export interface ConversationsRepo {
   /** Insert or refresh; returns the local conversation id. Caller owns the transaction. */
   ensure(identity: ConversationIdentity, now: number): number;
   findId(selfUin: string, type: ConversationType, sourceId: string): number | undefined;
+  /** Boot-time reconciliation: config is the authority for summary membership. */
+  syncSummaryFlags(selfUin: string, summaryGroupIds: readonly string[], now: number): void;
 }
 
 export function createConversationsRepo(db: Database): ConversationsRepo {
@@ -47,6 +49,18 @@ export function createConversationsRepo(db: Database): ConversationsRepo {
     findId(selfUin, type, sourceId) {
       const row = find.get(selfUin, type, sourceId) as { id: number } | undefined;
       return row?.id;
+    },
+    syncSummaryFlags(selfUin, summaryGroupIds, now) {
+      const placeholders = summaryGroupIds.map(() => "?").join(", ");
+      const inList = summaryGroupIds.length > 0 ? `source_id IN (${placeholders})` : "0";
+      db.raw
+        .prepare(
+          `UPDATE conversations SET
+             summary_enabled = CASE WHEN type = 'group' AND ${inList} THEN 1 ELSE 0 END,
+             updated_at = ?
+           WHERE self_uin = ?`,
+        )
+        .run(...summaryGroupIds, now, selfUin);
     },
   };
 }

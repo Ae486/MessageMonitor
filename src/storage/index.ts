@@ -4,6 +4,7 @@ import { createConversationsRepo, type ConversationsRepo } from "./repositories/
 import { createMessagesRepo, type MessagesRepo } from "./repositories/messages.ts";
 import { createProgressRepo, type ProgressRepo } from "./repositories/progress.ts";
 import { createRuntimeStateRepo, type RuntimeStateRepo } from "./repositories/runtime-state.ts";
+import { createSummaryUnitsRepo, type SummaryUnitsRepo } from "./repositories/summary-units.ts";
 
 export interface Storage {
   conversations: ConversationsRepo;
@@ -11,6 +12,7 @@ export interface Storage {
   captureGaps: CaptureGapsRepo;
   progress: ProgressRepo;
   runtimeState: RuntimeStateRepo;
+  summaryUnits: SummaryUnitsRepo;
 }
 
 export function createStorage(db: Database): Storage {
@@ -21,5 +23,6 @@ export function createStorage(db: Database): Storage {
     captureGaps: createCaptureGapsRepo(db),
     progress: createProgressRepo(db),
     runtimeState: createRuntimeStateRepo(db),
+    summaryUnits: createSummaryUnitsRepo(db),
   };
 }

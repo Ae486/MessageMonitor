@@ -160,6 +160,14 @@ export const ConfigSchema = z
         message: "producer is required when summary.enabled is true",
       });
     }
+    if (config.storage.summaryRetentionDays < config.storage.messageRetentionDays) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["storage", "summaryRetentionDays"],
+        message:
+          "must be >= messageRetentionDays; expired units would release their messages back into summarization",
+      });
+    }
     const capturedGroups = new Set(config.capture.groups.whitelist);
     const outside = config.summary.groupWhitelist.filter((id) => !capturedGroups.has(id));
     if (outside.length > 0) {

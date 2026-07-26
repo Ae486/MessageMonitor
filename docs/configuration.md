@@ -175,7 +175,7 @@ type CaptureConfig = {
 | `summaryRetentionDays` | integer | `180` | `1..3650` |
 | `cleanupIntervalHours` | integer | `24` | `1..168` |
 
-两个保留期独立。原始消息先过期时，摘要单元转为 Summary-Only Unit。
+`summaryRetentionDays` 必须不小于 `messageRetentionDays`：摘要单元先于消息过期会把已归属消息释放回摘要管线，违反单元一次性归属约束。原始消息先过期时，摘要单元转为 Summary-Only Unit。
 
 ### 3.8 `summary`
 

@@ -230,6 +230,38 @@ describe("ingest coordinator", () => {
     }
   });
 
+  it("fires onSummaryCandidate only for inserted messages in summary-enabled groups (AC-08 trigger)", () => {
+    const t = openTestDb();
+    try {
+      const pokes: number[] = [];
+      const ingest = createIngestCoordinator(makeConfig(), t.storage, silentLog, {
+        onSummaryCandidate: (conversationId) => pokes.push(conversationId),
+      });
+
+      ingest.handleEvent(groupMessage(), 1000);
+      expect(pokes).toHaveLength(1);
+
+      // Duplicate delivery: no second poke.
+      ingest.handleEvent(groupMessage(), 2000);
+      expect(pokes).toHaveLength(1);
+
+      // Friend messages never trigger summarization.
+      ingest.handleEvent(friendMessage(), 3000);
+      expect(pokes).toHaveLength(1);
+
+      // Captured group outside the summary whitelist: no poke.
+      const config = makeConfig({ groups: { whitelist: ["123456789", "555"] } });
+      config.summary.groupWhitelist = ["123456789"];
+      const ingest2 = createIngestCoordinator(config, t.storage, silentLog, {
+        onSummaryCandidate: (conversationId) => pokes.push(conversationId),
+      });
+      ingest2.handleEvent(groupMessage({ group_id: 555, message_id: 424242 }), 4000);
+      expect(pokes).toHaveLength(1);
+    } finally {
+      t.dispose();
+    }
+  });
+
   it("ignores events from a different self account (AC-02 boundary)", () => {
     const t = openTestDb();
     try {

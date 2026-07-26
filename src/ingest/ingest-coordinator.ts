@@ -13,10 +13,16 @@ export interface IngestCoordinator {
   handleEvent(event: unknown, now: number): void;
 }
 
+export interface IngestHooks {
+  /** Called after a message commits into a summary-enabled conversation. */
+  onSummaryCandidate?(conversationId: number): void;
+}
+
 export function createIngestCoordinator(
   config: AppConfig,
   storage: Storage,
   log: Logger,
+  hooks: IngestHooks = {},
 ): IngestCoordinator {
   const ingestLog = log.child({ component: "ingest" });
   const groupWhitelist = new Set(config.capture.groups.whitelist);
@@ -38,19 +44,15 @@ export function createIngestCoordinator(
     const { conversation, message } = normalized;
     if (!isCaptured(conversation.type, conversation.sourceId)) return true;
 
-    const result = storage.messages.ingest(
-      {
-        ...conversation,
-        summaryEnabled: conversation.type === "group" && summaryGroups.has(conversation.sourceId),
-      },
-      message,
-      now,
-    );
+    const summaryEnabled =
+      conversation.type === "group" && summaryGroups.has(conversation.sourceId);
+    const result = storage.messages.ingest({ ...conversation, summaryEnabled }, message, now);
     if (result.inserted) {
       ingestLog.debug(
         { conversationId: result.conversationId, messageId: result.messageId },
         "message captured",
       );
+      if (summaryEnabled) hooks.onSummaryCandidate?.(result.conversationId);
     }
     return true;
   };

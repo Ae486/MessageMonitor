@@ -13,6 +13,8 @@ import { createShutdown, installShutdownTriggers } from "./runtime/shutdown.ts";
 import { openDatabase, type Database } from "./storage/database.ts";
 import { createStorage } from "./storage/index.ts";
 import { runCleanup } from "./storage/maintenance/cleanup.ts";
+import { createOpenAiCompatibleProducer } from "./summary/summary-producer.ts";
+import { createSummaryQueue } from "./summary/summary-queue.ts";
 import type { AppConfig } from "./config/schema.ts";
 
 const VERSION = "0.1.0";
@@ -69,7 +71,29 @@ async function main(): Promise<void> {
 
   const storage = createStorage(db);
   const accessToken = process.env[config.bridge.accessTokenEnv] ?? "";
-  const ingest = createIngestCoordinator(config, storage, log);
+
+  const producerConfig = config.summary.producer;
+  const summaryQueue = createSummaryQueue(config.summary, {
+    units: storage.summaryUnits,
+    producer:
+      config.summary.enabled && producerConfig !== undefined
+        ? createOpenAiCompatibleProducer({
+            baseUrl: producerConfig.baseUrl,
+            model: producerConfig.model,
+            ...(producerConfig.apiKeyEnv !== undefined
+              ? { apiKey: process.env[producerConfig.apiKeyEnv] }
+              : {}),
+            requestTimeoutMs: config.summary.requestTimeoutMs,
+          })
+        : { produce: () => Promise.reject(new Error("summary disabled")) },
+    log,
+  });
+
+  const ingest = createIngestCoordinator(config, storage, log, {
+    onSummaryCandidate: (conversationId) => {
+      summaryQueue.poke(conversationId);
+    },
+  });
   const lifecycle = createLifecycleController(
     {
       targetSelfUin: config.account.targetSelfUin,
@@ -94,6 +118,7 @@ async function main(): Promise<void> {
       close: async () => {
         clearInterval(cleanupTimer);
         await lifecycle.close();
+        await summaryQueue.close();
         await server.close();
         db.close();
       },
@@ -107,6 +132,12 @@ async function main(): Promise<void> {
   installShutdownTriggers(shutdown);
 
   await connectStdio(server);
+  storage.conversations.syncSummaryFlags(
+    config.account.targetSelfUin,
+    config.summary.enabled ? config.summary.groupWhitelist : [],
+    Date.now(),
+  );
+  summaryQueue.recover();
   lifecycle.start();
   log.info(
     {

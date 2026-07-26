@@ -166,8 +166,8 @@ targetSelfUin + conversationType + conversationId + sourceMessageId
 
 ### 7.3 输出校验
 
-- `summaryText` 必须是字符串。
-- 所有配置维度必须存在并返回数组；无内容时为空数组。
+- `summaryText` 必须是非空字符串。
+- Finding 只允许引用已配置维度；输出中未出现的维度视为空数组。
 - 每个 Summary Finding 包含 `text` 和源消息 ID 数组。
 - 源消息 ID 必须属于当前冻结单元。
 - 非法字段、未知维度和越界消息引用导致本次输出校验失败。
