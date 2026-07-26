@@ -32,8 +32,11 @@ conversations
 
 feed_progress ─→ feed_events
 runtime_state
+table_counters
 schema_migrations
 ```
+
+`table_counters` 由触发器维护 `messages` 与 `summary_units` 的行数，使状态工具以 O(1) 读取计数而不扫描消息表（性能要求 3.2）。
 
 ## 4. 表定义
 
