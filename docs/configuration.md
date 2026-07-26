@@ -106,7 +106,7 @@
 | `capture` | object | 是 | 会话采集范围 |
 | `messages` | object | 否 | 撤回内容策略 |
 | `storage` | object | 是 | SQLite 和保留期 |
-| `summary` | object | 否 | 后台摘要 |
+| `summary` | object | 否 | 后台摘要；整块缺省时视为禁用 |
 | `agent` | object | 否 | Agent consumer 标识 |
 | `logging` | object | 否 | 本地日志策略 |
 
@@ -194,6 +194,10 @@ type CaptureConfig = {
 | `dimensions` | object | `{}` | 动态摘要维度 |
 
 `threshold` 只触发任务。任务开始时按 `maxInputTokensPerCall` 预算冻结最旧一段未摘要消息（通常为全部）；超出预算的剩余消息在当前单元完成后成为后续单元。
+
+整个 `summary` 块缺省等价于 `enabled=false`，不要求 `producer`；显式写出 `summary` 块（包括空对象）则按字段默认 `enabled=true` 处理并要求 `producer`。
+
+`storage.databasePath` 的 `${NAME}` 展开不得引用 `accessTokenEnv` 或 `apiKeyEnv` 指定的密钥变量，出现即配置错误。
 
 #### `summary.producer`
 
