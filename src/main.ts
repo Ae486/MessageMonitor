@@ -1,14 +1,34 @@
 /**
- * Entry point: strict config load, stderr logging, empty stdio MCP server,
- * graceful shutdown on signals, stdin EOF, and transport close.
+ * Entry point: strict config load, stderr logging, SQLite open + forward
+ * migration, retention cleanup scheduling, empty stdio MCP server, graceful
+ * shutdown on signals, stdin EOF, and transport close.
  */
 import process from "node:process";
 import { ConfigError, loadConfig } from "./config/load-config.ts";
-import { createLogger } from "./logging/logger.ts";
+import { createLogger, type Logger } from "./logging/logger.ts";
 import { connectStdio, createMcpServer } from "./mcp/server.ts";
 import { createShutdown, installShutdownTriggers } from "./runtime/shutdown.ts";
+import { openDatabase, type Database } from "./storage/database.ts";
+import { createStorage } from "./storage/index.ts";
+import { runCleanup } from "./storage/maintenance/cleanup.ts";
+import type { AppConfig } from "./config/schema.ts";
 
 const VERSION = "0.1.0";
+
+function runScheduledCleanup(db: Database, config: AppConfig, log: Logger): void {
+  try {
+    const result = runCleanup(db, {
+      messageRetentionDays: config.storage.messageRetentionDays,
+      summaryRetentionDays: config.storage.summaryRetentionDays,
+      now: Date.now(),
+    });
+    createStorage(db).runtimeState.set("lastCleanupAt", Date.now(), Date.now());
+    log.info({ ...result }, "retention cleanup finished");
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    log.warn({ err: reason }, "retention cleanup failed; capture is unaffected");
+  }
+}
 
 async function main(): Promise<void> {
   const bootLog = createLogger("info");
@@ -26,8 +46,36 @@ async function main(): Promise<void> {
   }
 
   const log = createLogger(config.logging.level);
+
+  let db: Database;
+  try {
+    db = openDatabase(config.storage.databasePath);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    log.error({ err: reason }, "cannot open or migrate the database; refusing to start");
+    process.exitCode = 1;
+    return;
+  }
+
+  runScheduledCleanup(db, config, log);
+  const cleanupTimer = setInterval(
+    () => {
+      runScheduledCleanup(db, config, log);
+    },
+    config.storage.cleanupIntervalHours * 60 * 60 * 1000,
+  );
+
   const server = createMcpServer(VERSION);
-  const shutdown = createShutdown(server, log);
+  const shutdown = createShutdown(
+    {
+      close: async () => {
+        clearInterval(cleanupTimer);
+        await server.close();
+        db.close();
+      },
+    },
+    log,
+  );
 
   server.server.onclose = () => {
     shutdown("transport closed");
